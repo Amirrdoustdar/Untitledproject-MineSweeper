@@ -1,86 +1,100 @@
+import random
+
 def create_board(n, m, bombs):
-    """
-    Create a Minesweeper board with the given dimensions and bomb locations.
-    
-    :param n: Number of rows in the board.
-    :param m: Number of columns in the board.
-    :param bombs: List of tuples representing bomb coordinates.
-    :return: A 2D list representing the Minesweeper board.
-    """
     board = [[0 for _ in range(m)] for _ in range(n)]
-    
     for x, y in bombs:
-        if 0 <= x-1 < n and 0 <= y-1 < m:
-            board[x-1][y-1] = '*'
-    
+        board[x][y] = '*'
     return board
 
-def update_board_with_counts(board, n, m, bombs):
-    """
-    Update the board with the count of adjacent bombs for each cell.
-    
-    :param board: The Minesweeper board.
-    :param n: Number of rows in the board.
-    :param m: Number of columns in the board.
-    :param bombs: List of tuples representing bomb coordinates.
-    """
-    for x, y in bombs:
-        for dx in [-1, 0, 1]:
-            for dy in [-1, 0, 1]:
-                nx, ny = x - 1 + dx, y - 1 + dy
-                if 0 <= nx < n and 0 <= ny < m and board[nx][ny] != '*':
-                    board[nx][ny] += 1
+def update_board_with_counts(board, n, m):
+    directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+    for x in range(n):
+        for y in range(m):
+            if board[x][y] == '*':
+                continue
+            count = 0
+            for dx, dy in directions:
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < n and 0 <= ny < m and board[nx][ny] == '*':
+                    count += 1
+            board[x][y] = count
 
-def print_board(board):
-    """
-    Print the Minesweeper board in a user-friendly format.
-    
-    :param board: The Minesweeper board to print.
-    """
-    for row in board:
-        print(' | '.join(map(str, row)))
-        print('-' * (4 * len(row) - 1))
+def print_board(board, revealed):
+    for i, row in enumerate(board):
+        for j, cell in enumerate(row):
+            if revealed[i][j]:
+                print(cell, end=' ')
+            else:
+                print('#', end=' ')
+        print()
 
-def validate_input(n, m, k, bombs):
-    """
-    Validate the input values for the Minesweeper game.
+def generate_bombs(n, m, k):
+    positions = set()
+    while len(positions) < k:
+        x, y = random.randint(0, n - 1), random.randint(0, m - 1)
+        positions.add((x, y))
+    return positions
+
+def uncover_cell(board, revealed, x, y):
+    if board[x][y] == '*':
+        print("Boom! You hit a bomb.")
+        return True
     
-    :param n: Number of rows in the board.
-    :param m: Number of columns in the board.
-    :param k: Number of bombs.
-    :param bombs: List of tuples representing bomb coordinates.
-    :return: True if the input is valid, False otherwise.
-    """
-    if n <= 0 or m <= 0:
-        print("Error: Board dimensions must be positive.")
-        return False
-    if k < 0 or k > n * m:
-        print("Error: Number of bombs must be between 0 and the total number of cells.")
-        return False
-    for x, y in bombs:
-        if x < 1 or x > n or y < 1 or y > m:
-            print(f"Error: Bomb at ({x}, {y}) is out of bounds.")
-            return False
-    return True
+    revealed[x][y] = True
+    if board[x][y] == 0:
+        directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+        for dx, dy in directions:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < len(board) and 0 <= ny < len(board[0]) and not revealed[nx][ny]:
+                uncover_cell(board, revealed, nx, ny)
+    return False
 
 def main():
-    """
-    Main function to run the Minesweeper game.
-    """
-    try:
-        n, m = map(int, input("Enter the number of rows and columns (n m): ").split())
-        k = int(input("Enter the number of bombs (k): "))
-        bombs = [tuple(map(int, input(f"Enter bomb {i+1} coordinates (x y): ").split())) for i in range(k)]
-        
-        if not validate_input(n, m, k, bombs):
-            return
-        
-        board = create_board(n, m, bombs)
-        update_board_with_counts(board, n, m, bombs)
-        print_board(board)
+    print("Select difficulty level:")
+    print("1. Easy (5x5, 5 bombs)")
+    print("2. Medium (10x10, 20 bombs)")
+    print("3. Hard (15x15, 40 bombs)")
     
+    try:
+        choice = int(input("Enter your choice (1-3): "))
+        if choice == 1:
+            n, m, k = 5, 5, 5
+        elif choice == 2:
+            n, m, k = 10, 10, 20
+        elif choice == 3:
+            n, m, k = 15, 15, 40
+        else:
+            print("Invalid choice. Defaulting to Easy.")
+            n, m, k = 5, 5, 5
+
+        bombs = generate_bombs(n, m, k)
+        board = create_board(n, m, bombs)
+        update_board_with_counts(board, n, m)
+        
+        revealed = [[False for _ in range(m)] for _ in range(n)]
+        
+        while True:
+            print_board(board, revealed)
+            try:
+                x, y = map(int, input("Enter cell to uncover (row col): ").split())
+                if x < 1 or x > n or y < 1 or y > m:
+                    print("Invalid coordinates. Try again.")
+                    continue
+                
+                if uncover_cell(board, revealed, x - 1, y - 1):
+                    print_board(board, [[True for _ in range(m)] for _ in range(n)])
+                    print("Game Over!")
+                    break
+                
+                if all(revealed[i][j] or board[i][j] == '*' for i in range(n) for j in range(m)):
+                    print("Congratulations! You've cleared the board.")
+                    break
+            except ValueError:
+                print("Invalid input. Enter row and column as integers.")
+                continue
+
     except ValueError:
-        print("Error: Invalid input format. Please enter integers.")
+        print("Invalid input. Exiting game.")
 
 if __name__ == "__main__":
     main()
